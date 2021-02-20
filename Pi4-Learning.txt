@@ -1,0 +1,296 @@
+1.Install Rasbain to Micro SD card
+2.Copy 2 file to Micro SD card drive Boot 
+		- ssh
+		- wpa_supplicant.conf
+3.Insert Micro SD card to RaspberryPi
+4.Scan IP Raspberry from network
+5.login Pi  in Putty
+	user : pi    pass : raspberry
+6.Config RaspberryPi with Command
+	sudo raspi-config
+7.Change user pi password  menu (1)
+8.Config Network Options (2)
+	- Change Hostname(device name) "raspberrypi" (N1)
+	- Setup Wifi  (N2)
+	- enable Network interface names (N3)
+9.Config Boot Options (3)
+	- Select (B1) Desktop/CLI   and select (B4) Desktop autologin desktop GUI
+10.Setup Localisation Options(4)
+	- Change Locale (I1)  select en_US.UTF-8 UTF-8 , th_TH.UTF-8 UTF-8 
+	- Change Timezone (I2) to Asin > Bangkok
+	- Change WI-fi Country (I4) to Thailand
+11.Config Interfacing Options (5)
+	- enable SSH (P2)
+	- enable VNC (P3)
+	or Enable interface All
+12.Config Advanced Options (7)
+	- Expand filesystem (A1)
+	- Memory Split (A3) change to 256
+	- Audio (A4) change to auto
+	- Resolution (A5) change to DMT Mode 82 1920x1080 60Hz 16:9 //ระวังค้าง
+	- GL Driver (A8) change to GL (Fake KMS) Oprn GL (G2)
+13.Update (8)	
+14.Finish
+15.Reboot raspberrypi with command
+		sudo reboot
+16.Login with Putty again
+17.Update sources.lists with command
+		sudo apt update
+		sudo apt full-upgrade
+		sudo apt install acl
+18.Run command Enable SSH
+		sudo systemctl enable ssh
+19.Config  /etc/network/interfaces With command
+			sudo nano /etc/network/interfaces
+			
+			#Insert command DHCP to file
+auto lo
+iface lo inet loopback
+
+auto eth0
+allow-hotplug eth0
+iface eth0 inet dhcp
+
+auto wlan0
+allow-hotplug wlan0
+iface wlan0 inet manual
+wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
+iface default inet dhcp
+			 #-----------------------------------------------------
+			 
+			sudo chmod 600 /etc/network/interfaces   [ไม่ต้องกำหนดก็ได้]
+20. Config /etc/wpa_supplicant/wpa_supplicant.conf
+		sudo nano /etc/wpa_supplicant/wpa_supplicant.conf
+		 #-----------------------------------------------------
+		ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+			update_config=1
+			country=TH
+			network={
+			 ssid="Nsine@wifi"
+			 psk="4321050013"
+			 key_mgmt=WPA-PSK
+			}
+			network={
+			 ssid="Nsine@wifi5G"
+			 psk="4321050013"
+			 key_mgmt=WPA-PSK
+			}
+		#-----------------------------------------------------
+21.Script Reconnect Wifi
+		sudo nano /etc/chkwifi.bat
+		#----------------------------------------------------
+#!/bin/bash
+while true; do
+curl --fail --silent https://www.google.com > /dev/null
+if [[ $? -ne 0 ]]; then
+echo "WIFI DOWN! $(date)"
+sudo /sbin/ifdown --force wlan0
+sudo /sbin/ifup --force wlan0
+sleep 10
+else
+echo "OK"
+sleep 600
+ fi
+done;
+		#----------------------------------------------------
+		sudo chmod 7777 /etc/chkwifi.bat
+		sudo nano /etc/rc.local
+		 ในบรรทัดข้างบน "exit 0" ของไฟล์ rc.local ให้เพิ่มบรรทัดคำสั่งนี้เข้าไป
+		/etc/chkwifi.bat
+		
+		sudo init 6
+		
+#===========================================================
+#
+#   Adding ntfs to usbmount  it WORK
+Install usbmount with 
+			sudo apt-get install usbmount
+Install NTFS driver package ntfs-3g with 
+			sudo apt-get install ntfs-3g
+Change FILESYSTEMS to : 
+			FILESYSTEMS="vfat ntfs fuseblk ext2 ext3 ext4 hfsplus"
+Change FS_MOUNTOPTIONS to: 
+		FS_MOUNTOPTIONS="-fstype=ntfs-3g,nls=utf8,umask=007,gid=46
+		-fstype=fuseblk,nls=utf8,umask=007,gid=46 -fstype=vfat,gid=1000,uid=1000,umask=007"
+
+https://raspberrypi.stackexchange.com/questions/41959/automount-various-usb-stick-file-systems-on-jessie-lite
+#===========================================================
+
+
+22. Mount HDD
+		
+		 sudo blkid                                         #Hardware ID OR UUID
+		sudo df -h                                        #auto mount check
+		sudo fdisk -l
+		sudo mkdir /home/pi/data
+		sudo chown -R pi:pi /home/pi/data
+		cd /mnt/extdrive
+		ls -al
+		sudo nano /etc/fstab
+		#----------------------------------------------------
+		/dev/sda1 /media/pi/Data ntfs-3g auto,nofail,rw,default 0 0   OR  UUID=AC1B1A003095A888 /media/pi/Data ntfs-3g auto,nofail,rw,default 0 0
+		
+		#----------------------------------------------------
+
+#เพิ่ม USB Drive แบบ ext4 ให้ Raspberry Pi		
+
+		PARTUUID=dd3f175b-01 /home/pi/data ext4  defaults,noatime  0    1
+		
+	
+22 Install UFW Firewall   [ไม่ต้องกำหนดก็ได้]
+	sudo apt install ufw
+	sudo apt install nmap
+	sudo ufw allow 21,22,80,443,25,53,587,465,143,993,2122,9091,10000,51413/tcp
+	sudo ufw logging on
+	sudo ufw logging medium
+	sudo ufw enable    //sudo ufw disable
+	
+	
+22.Install and Configure Samba Server
+	sudo apt install samba samba-common-bin
+	sudo systemctl start smbd
+	sudo nano /etc/samba/smb.conf
+#----------------------------------------------------
+[Private]
+comment = needs username and password to access
+path = /mnt/extdrive/private/
+browseable = yes
+guest ok = no
+writable = yes
+valid users = @samba
+#----------------------------------------------------
+
+	sudo smbpasswd -a pi
+	sudo groupadd samba
+	sudo gpasswd -a pi samba
+	sudo mkdir -p /mnt/extdrive/private   #----กรณียังไม่สร้างโฟลเดอร์
+	sudo setfacl -R -m "g:samba:rwx" /mnt/extdrive/private/
+	sudo systemctl restart smbd
+	
+	sudo nano /etc/samba/smb.conf
+#----------------------------------------------------
+[public]
+comment = public share
+path = /mnt/extdrive/public/
+browseable = yes
+writable = yes
+guest ok = yes
+#----------------------------------------------------
+sudo mkdir -p /mnt/extdrive/public   #----กรณียังไม่สร้างโฟลเดอร์
+sudo setfacl -R -m "u:nobody:rwx" /mnt/extdrive/public/
+sudo systemctl restart smbd
+		
+#====== Install Apache2 & PHP & MySQL (MariaDB Server) on Raspberry Pi===========
+			sudo apt update && sudo apt upgrade -y
+			sudo apt install apache2 -y
+			#cd /var/www/html
+			#hostname -I
+			
+			sudo apt install php -y
+			sudo service apache2 restart
+			
+			sudo apt install mariadb-server php-mysql -y
+			sudo service apache2 restart
+			sudo mysql_secure_installation
+			
+	pi@raspberrypi:/var/www/html $ sudo mysql --user=root --password
+		> create user pi@localhost identified by '5399';
+		> grant all privileges on *.* to pi@localhost;
+		> FLUSH PRIVILEGES;
+		> exit;
+		
+	Install phpMyAdmin on Raspberry Pi
+		sudo apt install phpmyadmin -y
+		sudo phpenmod mysqli
+		sudo service apache2 restart
+		sudo ln -s /usr/share/phpmyadmin /var/www/html/phpmyadmin
+	
+	Optional Step (but recommended)
+		ls -lh /var/www/
+		sudo chown -R pi:www-data /var/www/html/
+		sudo chmod -R 770 /var/www/html/
+		ls -lh /var/www/
+#--------------------------------------------------------------------
+#Creating a Simple FTP Server with a Raspberry Pi
+	sudo apt-get update
+	sudo apt-get install vsftpd
+	sudo nano /etc/vsftpd.conf
+	
+# add text in file
+			anonymous_enable=NO
+			local_enable=YES
+			write_enable=YES
+			local_umask=022
+			chroot_local_user=YES
+			
+#Add the following lines to the end of the file :
+		user_sub_token=pi
+		local_root=/home/pi/data
+		sudo chown -R pi:pi /home/pi/data
+
+		sudo service vsftpd restart
+
+#---------------------------------------------------------------------------------------------
+
+23.Installing Transmission on Raspbian
+	sudo apt-get install transmission-daemon  1.21
+	sudo chmod  -R 777 /mnt/extdrive/      sudo chmod  -R 777 /home/pi/data/
+	sudo service transmission-daemon reload
+	sudo nano /etc/transmission-daemon/settings.json
+	
+	#-------------------------------------------
+	"download-dir": "/home/pi/data/complete",
+	"incomplete-dir": "/home/pi/data/incomplete",
+	"rpc-whitelist-enabled": false,
+#----------------------------------------------
+
+sudo service transmission-daemon reload
+sudo service transmission-daemon restart
+
+
+===============================================
+Uninstall transmission-daemon
+To remove just transmission-daemon package itself from Debian 8 (Jessie) execute on terminal:
+
+				sudo apt-get remove transmission-daemon
+
+Uninstall transmission-daemon and it's dependent packages
+To remove the transmission-daemon package and any other dependant package which are no longer needed from Debian Jessie.
+
+					sudo apt-get autoremove transmission-daemon
+					
+Purging transmission-daemon
+If you also want to delete configuration and/or data files of transmission-daemon from Debian Jessie then this will work:
+
+				sudo apt-get purge transmission-daemon
+				
+To delete configuration and/or data files of transmission-daemon and it's dependencies from Debian Jessie then execute:
+
+			sudo apt-get autoremove --purge transmission-daemon
+			
+			
+#-------------------------------mysql--------------------------------------------------
+ 1.log in to the MySQL command line
+		sudo mysql -u root -p
+		
+2.creating a MySQL database
+		CREATE DATABASE exampledb;
+		
+3.create a MySQL user
+		CREATE USER 'user'@'localhost' IDENTIFIED BY 'password';
+4.grant all permissions
+		GRANT ALL PRIVILEGES ON innonardb.* TO 'innonar'@'localhost';
+5.flush the privilege table
+		FLUSH PRIVILEGES;
+#=======================SSH Command==============
+sudo service ssh stop
+sudo service ssh start
+sudo service ssh restart
+sudo systemctl enable ssh
+sudo service ssh status   OR   sudo systemctl status ssh
+
+#=======================System Command==============
+sudo halt    OR     
+sudo shutdown -r now (or sudo reboot)     //reboot
+exit Putty
+exit
